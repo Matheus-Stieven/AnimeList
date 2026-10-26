@@ -15,9 +15,7 @@ let hasNextPage = false;
 let requestVersion = 0;
 let activeController = null;
 let searchMode = "popular";
-let lastResults = [];
-
-const cache = new Map();
+let cache = new Map();
 
 function escapeHTML(value = "") {
   return String(value).replace(/[&<>"']/g, char => ({
@@ -33,22 +31,22 @@ function safeImage(url) {
   try {
     const parsed = new URL(url);
     return ["https:", "http:"].includes(parsed.protocol)
-      ? parsed.href
-      : "";
+      ? parsed.href : "";
   } catch {
     return "";
   }
 }
 
-function showMessage(text, isError = false) {
+function showMessage(text, error = false) {
   message.textContent = text;
-  message.className = isError ? "message error" : "message";
+  message.className = error ? "message error" : "message";
   message.hidden = false;
 }
 
 function setLoading(loading) {
   document.querySelector("#prev-btn").disabled =
     loading || currentPage <= 1;
+
   document.querySelector("#next-btn").disabled =
     loading || !hasNextPage;
 }
@@ -59,34 +57,42 @@ async function apiRequest(path, signal) {
   const response = await fetch(`${API}${path}`, { signal });
 
   if (response.status === 429) {
-    throw new Error("Muitas consultas em sequência. Aguarde alguns segundos e tente novamente.");
+    throw new Error(
+      "Limite de consultas atingido. Aguarde alguns segundos e tente novamente."
+    );
   }
 
   if (!response.ok) {
-    throw new Error(`Erro na API (${response.status}). Tente novamente.`);
+    throw new Error(
+      `A API retornou erro ${response.status}. Tente novamente mais tarde.`
+    );
   }
 
   const json = await response.json();
+
+  if (json.error) {
+    throw new Error(json.message || "A API retornou um erro.");
+  }
+
   cache.set(path, json);
   return json;
 }
 
-function getQueryPath() {
+function buildQuery() {
   const params = new URLSearchParams();
+
   params.set("page", currentPage);
   params.set("limit", "20");
 
-  if (searchMode === "search") {
-    params.set("q", searchInput.value.trim());
-  }
+  const term = searchInput.value.trim();
 
-  if (genreFilter.value) {
-    params.set("genres", genreFilter.value);
-  }
+  if (term) params.set("q", term);
+  if (genreFilter.value) params.set("genres", genreFilter.value);
 
-  params.set("order_by", sortFilter.value);
+  const order = sortFilter.value;
+  params.set("order_by", order);
 
-  if (sortFilter.value === "title") {
+  if (order === "title") {
     params.set("sort", "asc");
   } else {
     params.set("sort", "desc");
@@ -99,54 +105,71 @@ async function loadAnime() {
   const version = ++requestVersion;
 
   if (activeController) activeController.abort();
+
   activeController = new AbortController();
 
   const signal = activeController.signal;
 
   grid.replaceChildren();
-  showMessage("Explorando o universo dos animes...");
+  showMessage("Carregando animes...");
   setLoading(true);
+  hasNextPage = false;
 
   try {
-    const path = searchMode === "popular" && !genreFilter.value
-      && !searchInput.value.trim() && sortFilter.value === "score"
-      ? `/top/anime?page=${currentPage}&limit=20`
-      : getQueryPath();
+    let path;
+
+    if (
+      searchMode === "popular" &&
+      !searchInput.value.trim() &&
+      !genreFilter.value &&
+      sortFilter.value === "score"
+    ) {
+      path = `/top/anime?page=${currentPage}&limit=20`;
+    } else {
+      path = buildQuery();
+    }
 
     const json = await apiRequest(path, signal);
 
     if (version !== requestVersion) return;
 
-    lastResults = json.data || [];
-    hasNextPage = Boolean(json.pagination?.has_next_page);
+    const animes = json.data || [];
+    const unique = [
+      ...new Map(animes.map(anime => [anime.mal_id, anime])).values()
+    ];
 
-    renderAnime(lastResults);
+    hasNextPage = Boolean(json.pagination?.has_next_page);
+    renderAnime(unique);
 
     document.querySelector("#stat-total").textContent =
       json.pagination?.items?.total?.toLocaleString("pt-BR") ||
-      lastResults.length;
+      unique.length;
 
     document.querySelector("#page-number").textContent =
       `Página ${currentPage}`;
+
     document.querySelector("#page-label").textContent =
       `Página ${currentPage}`;
 
     document.querySelector("#results-label").textContent =
-      searchMode === "search"
+      searchInput.value.trim()
         ? `Resultados para "${searchInput.value.trim()}"`
         : genreFilter.value
           ? "Animes filtrados"
           : "Animes em destaque";
 
-    if (!lastResults.length) {
-      showMessage("Nenhum anime encontrado. Experimente outra pesquisa.");
+    if (!unique.length) {
+      showMessage("Nenhum anime encontrado. Tente outra pesquisa.");
     } else {
       message.hidden = true;
     }
   } catch (error) {
     if (error.name === "AbortError" || version !== requestVersion) return;
 
-    showMessage(error.message || "Não foi possível carregar os animes.", true);
+    showMessage(
+      `${error.message} Se o problema continuar, verifique a documentação da Tenrai.`,
+      true
+    );
   } finally {
     if (version === requestVersion) setLoading(false);
   }
@@ -164,31 +187,29 @@ function renderAnime(animes) {
     card.setAttribute("role", "button");
     card.setAttribute("aria-label", `Ver detalhes de ${anime.title}`);
 
-    const image = safeImage(anime.images?.webp?.large_image_url)
-      || safeImage(anime.images?.jpg?.large_image_url);
-
-    const genres = (anime.genres || [])
-      .slice(0, 2)
-      .map(genre => genre.name)
-      .join(" · ");
-
     const poster = document.createElement("div");
     poster.className = "poster-wrap";
 
-    if (image) {
+    const imageURL = safeImage(
+      anime.images?.webp?.large_image_url ||
+      anime.images?.jpg?.large_image_url ||
+      anime.image_url
+    );
+
+    if (imageURL) {
       const img = document.createElement("img");
       img.className = "poster";
-      img.src = image;
-      img.alt = `Capa de ${anime.title}`;
+      img.src = imageURL;
+      img.alt = `Capa de ${anime.title || "anime"}`;
       img.loading = "lazy";
+
       img.onerror = () => {
         img.remove();
-        poster.classList.add("poster-fallback");
         poster.textContent = "✦";
       };
+
       poster.append(img);
     } else {
-      poster.classList.add("poster-fallback");
       poster.textContent = "✦";
     }
 
@@ -206,7 +227,7 @@ function renderAnime(animes) {
     info.className = "card-info";
 
     const title = document.createElement("h3");
-    title.textContent = anime.title;
+    title.textContent = anime.title || "Título indisponível";
 
     const meta = document.createElement("div");
     meta.className = "card-meta";
@@ -217,17 +238,23 @@ function renderAnime(animes) {
       : `${anime.episodes} episódios`;
 
     const year = document.createElement("span");
-    year.textContent = anime.year || "—";
-
-    const genre = document.createElement("div");
-    genre.className = "genres";
-    genre.textContent = genres || "Gêneros variados";
+    year.textContent = anime.year ||
+      anime.aired?.prop?.from?.year || "—";
 
     meta.append(episodes, year);
-    info.append(title, meta, genre);
+
+    const genres = document.createElement("div");
+    genres.className = "genres";
+    genres.textContent = (anime.genres || [])
+      .slice(0, 2)
+      .map(item => item.name)
+      .join(" · ") || "Anime";
+
+    info.append(title, meta, genres);
     card.append(poster, info);
 
     const open = () => openDetails(anime.mal_id);
+
     card.addEventListener("click", open);
     card.addEventListener("keydown", event => {
       if (event.key === "Enter" || event.key === " ") {
@@ -245,6 +272,7 @@ function renderAnime(animes) {
 function setPage(page) {
   currentPage = page;
   loadAnime();
+
   document.querySelector("#catalogo").scrollIntoView({
     behavior: "smooth",
     block: "start"
@@ -304,23 +332,30 @@ modal.addEventListener("click", event => {
 
 async function openDetails(id) {
   modalContent.replaceChildren();
+
   const loading = document.createElement("p");
   loading.className = "message";
   loading.textContent = "Carregando detalhes...";
   modalContent.append(loading);
+
   modal.showModal();
 
   try {
-    const json = await apiRequest(`/anime/${id}/full`);
+    const json = await apiRequest(`/anime/${id}`);
+
     if (!modal.open) return;
-    renderDetails(json.data);
+
+    renderDetails(json.data || json);
   } catch (error) {
     if (!modal.open) return;
+
     modalContent.replaceChildren();
-    const errorText = document.createElement("p");
-    errorText.className = "message error";
-    errorText.textContent = error.message || "Erro ao carregar detalhes.";
-    modalContent.append(errorText);
+
+    const text = document.createElement("p");
+    text.className = "message error";
+    text.textContent = error.message;
+
+    modalContent.append(text);
   }
 }
 
@@ -330,28 +365,33 @@ function renderDetails(anime) {
   const layout = document.createElement("div");
   layout.className = "modal-layout";
 
-  const image = safeImage(anime.images?.webp?.large_image_url)
-    || safeImage(anime.images?.jpg?.large_image_url);
+  const imageURL = safeImage(
+    anime.images?.webp?.large_image_url ||
+    anime.images?.jpg?.large_image_url ||
+    anime.image_url
+  );
 
-  if (image) {
+  if (imageURL) {
     const img = document.createElement("img");
     img.className = "modal-poster";
-    img.src = image;
-    img.alt = `Capa de ${anime.title}`;
+    img.src = imageURL;
+    img.alt = `Capa de ${anime.title || "anime"}`;
     layout.append(img);
   }
 
   const info = document.createElement("div");
+
   const title = document.createElement("h2");
-  title.textContent = anime.title;
+  title.textContent = anime.title || "Anime";
+
   const score = document.createElement("p");
   score.className = "modal-meta";
   score.textContent =
     `★ ${anime.score ?? "Sem nota"} · ${anime.year || "Ano desconhecido"} · ${anime.episodes ?? "?"} episódios`;
 
-  const description = document.createElement("p");
-  description.className = "modal-description";
-  description.textContent = anime.synopsis || "Sinopse indisponível.";
+  const synopsis = document.createElement("p");
+  synopsis.className = "modal-description";
+  synopsis.textContent = anime.synopsis || "Sinopse indisponível.";
 
   const genres = document.createElement("div");
   genres.className = "modal-list";
@@ -362,7 +402,7 @@ function renderDetails(anime) {
     genres.append(item);
   });
 
-  info.append(title, score, description, genres);
+  info.append(title, score, synopsis, genres);
   layout.append(info);
   modalContent.append(layout);
 
@@ -411,12 +451,9 @@ function renderDetails(anime) {
 
 async function loadRelated(id, type) {
   const container = document.querySelector("#related-content");
-  const buttons = modalContent.querySelectorAll(".modal-action");
+  const buttons = modalContent.querySelectorAll("button.modal-action");
 
-  buttons.forEach(button => {
-    if (button.tagName === "BUTTON") button.disabled = true;
-  });
-
+  buttons.forEach(button => button.disabled = true);
   container.textContent = "Carregando informações...";
 
   try {
@@ -427,6 +464,7 @@ async function loadRelated(id, type) {
     heading.textContent = type === "characters"
       ? "Personagens"
       : "Episódios";
+
     container.append(heading);
 
     const list = document.createElement("div");
@@ -436,9 +474,11 @@ async function loadRelated(id, type) {
       const entry = document.createElement("span");
 
       if (type === "characters") {
-        entry.textContent = `${item.character?.name || "Personagem"} — ${item.role || "Elenco"}`;
+        entry.textContent =
+          `${item.character?.name || item.name || "Personagem"} — ${item.role || "Elenco"}`;
       } else {
-        entry.textContent = `Ep. ${item.mal_id}: ${item.title || "Título indisponível"}`;
+        entry.textContent =
+          `Ep. ${item.mal_id ?? item.episode ?? "—"}: ${item.title || "Título indisponível"}`;
       }
 
       list.append(entry);
@@ -450,11 +490,10 @@ async function loadRelated(id, type) {
       container.append(list);
     }
   } catch (error) {
-    container.textContent = error.message || "Não foi possível carregar os dados.";
+    container.textContent = error.message ||
+      "Não foi possível carregar os dados.";
   } finally {
-    buttons.forEach(button => {
-      if (button.tagName === "BUTTON") button.disabled = false;
-    });
+    buttons.forEach(button => button.disabled = false);
   }
 }
 
