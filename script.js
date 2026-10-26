@@ -1,5 +1,5 @@
 
-const API = "https://api.jikan.moe/v4";
+const API = "https://api.tenrai.org/v1";
 
 const grid = document.querySelector("#anime-grid");
 const message = document.querySelector("#message");
