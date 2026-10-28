@@ -5,44 +5,76 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0a10">
-  <meta name="description" content="Descubra animes, explore personagens e encontre sua próxima história favorita.">
+  <meta name="description" content="Descubra animes, explore personagens e encontre sua próxima história favorita com o AnimeVerse.">
   <title>AnimeVerse | Explore seu universo</title>
-  <link rel="preconnect" href="https://api.jikan.moe">
+
+  <!-- Conexão com a API Tenrai -->
+  <link rel="preconnect" href="https://api.tenrai.org">
+
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
 </head>
+
 <body>
   <header class="header">
     <a class="logo" href="#" aria-label="AnimeVerse início">
       <span class="logo-icon">✦</span>
       ANIME<span>VERSE</span>
     </a>
+
     <nav>
       <a href="#inicio">Início</a>
       <a href="#catalogo">Catálogo</a>
       <a href="#sobre">Sobre</a>
     </nav>
-    <span class="api-status"><i></i> API conectada</span>
+
+    <span class="api-status">
+      <i></i> API Tenrai
+    </span>
   </header>
 
   <main>
     <section class="hero" id="inicio">
       <div class="hero-content">
         <span class="eyebrow">✦ SEU UNIVERSO DE ANIMES</span>
-        <h1>Histórias que vão<br>além da <span>imaginação.</span></h1>
-        <p>Explore mundos extraordinários, descubra personagens
-          inesquecíveis e encontre sua próxima obsessão.</p>
-        <a href="#catalogo" class="primary-btn">Explorar catálogo <span>↗</span></a>
+
+        <h1>
+          Histórias que vão<br>
+          além da <span>imaginação.</span>
+        </h1>
+
+        <p>
+          Explore mundos extraordinários, descubra personagens
+          inesquecíveis e encontre sua próxima obsessão.
+        </p>
+
+        <a href="#catalogo" class="primary-btn">
+          Explorar catálogo <span>↗</span>
+        </a>
+
         <div class="hero-stats">
-          <div><strong id="stat-total">—</strong><small>Animes carregados</small></div>
-          <div><strong>100%</strong><small>Feito para fãs</small></div>
-          <div><strong>∞</strong><small>Novas descobertas</small></div>
+          <div>
+            <strong id="stat-total">—</strong>
+            <small>Animes carregados</small>
+          </div>
+
+          <div>
+            <strong>100%</strong>
+            <small>Feito para fãs</small>
+          </div>
+
+          <div>
+            <strong>∞</strong>
+            <small>Novas descobertas</small>
+          </div>
         </div>
       </div>
+
       <div class="hero-art">
         <div class="orb orb-one"></div>
         <div class="orb orb-two"></div>
         <div class="hero-symbol">✦</div>
+
         <div class="hero-caption">
           <span>ANIMEVERSE / 001</span>
           <span>YOUR NEXT ADVENTURE</span>
@@ -57,21 +89,30 @@
           <h2>Explore o catálogo<span>.</span></h2>
           <p>Encontre histórias que combinam com você.</p>
         </div>
-        <button id="popular-btn" class="secondary-btn">↻ Mais populares</button>
+
+        <button id="popular-btn" class="secondary-btn">
+          ↻ Mais populares
+        </button>
       </div>
 
       <form id="search-form" class="search-form">
         <label class="search-box">
           <span>⌕</span>
-          <input id="search-input" type="search"
+
+          <input
+            id="search-input"
+            type="search"
             placeholder="Pesquise pelo nome do anime..."
-            aria-label="Pesquisar anime">
+            aria-label="Pesquisar anime"
+          >
+
           <button type="submit">Buscar</button>
         </label>
 
         <div class="filters">
           <label>
             <span>Gênero</span>
+
             <select id="genre-filter">
               <option value="">Todos os gêneros</option>
               <option value="1">Ação</option>
@@ -86,8 +127,10 @@
               <option value="37">Sobrenatural</option>
             </select>
           </label>
+
           <label>
             <span>Ordenar por</span>
+
             <select id="sort-filter">
               <option value="score">Melhor avaliação</option>
               <option value="popularity">Popularidade</option>
@@ -95,7 +138,14 @@
               <option value="start_date">Mais recentes</option>
             </select>
           </label>
-          <button type="button" id="clear-btn" class="clear-btn">Limpar filtros</button>
+
+          <button
+            type="button"
+            id="clear-btn"
+            class="clear-btn"
+          >
+            Limpar filtros
+          </button>
         </div>
       </form>
 
@@ -104,40 +154,35 @@
         <span id="page-label">Página 1</span>
       </div>
 
-      <div id="message" class="message" role="status" aria-live="polite">
+      <div
+        id="message"
+        class="message"
+        role="status"
+        aria-live="polite"
+      >
         Carregando animes...
       </div>
+
       <div id="anime-grid" class="anime-grid"></div>
 
       <div class="pagination">
-        <button id="prev-btn" class="secondary-btn" disabled>← Anterior</button>
+        <button
+          id="prev-btn"
+          class="secondary-btn"
+          disabled
+        >
+          ← Anterior
+        </button>
+
         <span id="page-number">Página 1</span>
-        <button id="next-btn" class="secondary-btn">Próxima →</button>
+
+        <button id="next-btn" class="secondary-btn">
+          Próxima →
+        </button>
       </div>
     </section>
 
     <section class="about section" id="sobre">
       <span class="eyebrow">SOBRE O PROJETO</span>
-      <h2>Feito para quem vive <span>anime.</span></h2>
-      <p>O AnimeVerse é um catálogo interativo desenvolvido com
-        HTML, CSS e JavaScript. Os dados são obtidos da Jikan API,
-        que disponibiliza informações públicas do MyAnimeList.</p>
-      <div class="tech-list">
-        <span>HTML5</span><span>CSS3</span><span>JavaScript</span>
-        <span>REST API</span><span>Jikan API v4</span>
-      </div>
-    </section>
-  </main>
 
-  <footer class="footer">
-    <a class="logo" href="#inicio">✦ ANIME<span>VERSE</span></a>
-    <p>Desenvolvido por <strong>Matheus Henrique Stieven</strong></p>
-    <p>Trabalho acadêmico · Consulte os dados na Jikan API</p>
-  </footer>
-
-  <dialog id="anime-modal" class="anime-modal">
-    <button id="close-modal" class="close-modal" aria-label="Fechar">✕</button>
-    <div id="modal-content"></div>
-  </dialog>
-</body>
-</html>
+      <h2>Feito para quem vive <span>anime.</span></h
